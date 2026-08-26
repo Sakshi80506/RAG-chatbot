@@ -1,0 +1,19 @@
+# Web Framework
+fastapi
+uvicorn
+
+# For parsing multipart form data (necessary for file uploads in FastAPI)
+python-multipart
+
+# Environment variable management
+python-dotenv
+
+# LangChain ecosystem
+langchain
+langchain-openai
+langchain-community
+langchain-chroma
+
+# PDF processing and tokenization
+pypdf
+tiktoken
