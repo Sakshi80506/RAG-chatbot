@@ -1,2 +1,16 @@
+# Environment variables / API keys
 .env
-venv
+
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Chroma vector database
+.chroma_db/
+
+# Test/sample PDF files
+sample_test.pdf

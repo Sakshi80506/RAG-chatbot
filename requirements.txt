@@ -17,3 +17,12 @@ langchain-chroma
 # PDF processing and tokenization
 pypdf
 tiktoken
+langchain
+langchain-community
+langchain-openai
+langchain-text-splitters
+openai
+python-dotenv
+pypdf
+faiss-cpu
+sentence-transformers
