@@ -118,13 +118,19 @@ def ask_question(
     # 2. Format context string
     context_text = format_context(retrieved_docs)
 
-    # 3. Create the prompt template
+    # 3. Create the prompt template with Analytics Instructions
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", 
-         "You are a helpful and precise assistant answering questions about PDF documents.\n"
-         "Answer the user's question using ONLY the provided context below.\n"
-         "If the answer cannot be found in the context, truthfully state that the document does not contain that information.\n"
-         "Keep your answer clear, well-structured, and factual.\n\n"
+         "You are a helpful data assistant answering questions about PDFs.\n"
+         "Answer using ONLY the provided context.\n\n"
+         "FORMATTING RULES:\n"
+         "- If the user asks for a TABLE, format it strictly using Markdown tables.\n"
+         "- If the user asks for a CHART or GRAPH (bar, line, or pie), extract the numerical data and include a JSON block wrapped EXACTLY in <chart> tags at the end of your response.\n\n"
+         "CHART JSON FORMAT EXAMPLE:\n"
+         "<chart>\n"
+         '{{"type": "bar", "data": [{{"name": "Revenue", "value": 5000}}, {{"name": "Profit", "value": 2000}}]}}\n'
+         "</chart>\n\n"
+         "Valid chart types are: 'bar', 'line', 'pie'. The data array must contain objects with 'name' (string) and 'value' (number).\n\n"
          "CONTEXT:\n{context}"),
         ("human", "{question}")
     ])

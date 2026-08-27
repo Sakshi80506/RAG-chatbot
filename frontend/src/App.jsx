@@ -1,20 +1,77 @@
 import { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { 
+  BarChart, Bar, LineChart, Line, PieChart, Pie, 
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
+} from 'recharts';
 
-// The URL where our FastAPI backend is running
 const API_URL = 'http://localhost:8000';
 
-function App() {
-  // --- STATE MANAGEMENT ---
-  // We use React state to keep track of changing data in our UI.
-  const [documents, setDocuments] = useState([]); // List of uploaded PDFs
-  const [selectedDocId, setSelectedDocId] = useState(''); // Which PDF to chat with
-  const [messages, setMessages] = useState([]); // Chat history
-  const [inputText, setInputText] = useState(''); // What the user is typing
-  const [isUploading, setIsUploading] = useState(false); // Shows a loading spinner during upload
-  const [isTyping, setIsTyping] = useState(false); // Shows "Bot is typing..." during chat
+// Colors for the Pie Chart
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
-  // --- USE EFFECT ---
-  // Runs once when the component first loads to fetch the list of already uploaded PDFs
+// --- CUSTOM CHART RENDERER COMPONENT ---
+const ChartRenderer = ({ chartJson }) => {
+  try {
+    const config = JSON.parse(chartJson);
+    const { type, data } = config;
+
+    if (!data || data.length === 0) return null;
+
+    const chartHeight = 300;
+
+    return (
+      <div className="bg-white p-4 rounded-lg border mt-4 mb-2 shadow-sm w-full h-[350px]">
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          {type === 'bar' ? (
+            <BarChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="value" fill="#3b82f6" />
+            </BarChart>
+          ) : type === 'line' ? (
+            <LineChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} />
+            </LineChart>
+          ) : type === 'pie' ? (
+            <PieChart>
+              <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          ) : (
+            <p className="text-red-500">Unsupported chart type: {type}</p>
+          )}
+        </ResponsiveContainer>
+      </div>
+    );
+  } catch (error) {
+    return <div className="text-red-500 border p-2 text-sm mt-2">Failed to render chart: Invalid data format.</div>;
+  }
+};
+
+// --- MAIN APP ---
+function App() {
+  const [documents, setDocuments] = useState([]);
+  const [selectedDocId, setSelectedDocId] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [inputText, setInputText] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+
   useEffect(() => {
     fetchDocuments();
   }, []);
@@ -29,25 +86,15 @@ function App() {
     }
   };
 
-  // --- FILE UPLOAD HANDLER ---
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
     setIsUploading(true);
-    
-    // We must use FormData to send files over HTTP (standard JSON doesn't work for files)
     const formData = new FormData();
     formData.append('file', file);
-
     try {
-      const res = await fetch(`${API_URL}/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-      
+      const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
       if (res.ok) {
-        // Refresh the dropdown list to include the new file
         await fetchDocuments();
         alert('File uploaded successfully!');
       } else {
@@ -57,41 +104,30 @@ function App() {
       alert('Error uploading file.');
     } finally {
       setIsUploading(false);
-      event.target.value = ''; // Reset the file input
+      event.target.value = ''; 
     }
   };
 
-  // --- CHAT HANDLER ---
   const sendMessage = async (e) => {
-    e.preventDefault(); // Prevents the page from refreshing when you submit the form
+    e.preventDefault();
     if (!inputText.trim()) return;
-
     const userMessage = inputText;
-    setInputText(''); // Clear input box immediately
-    
-    // Add user's message to the chat interface
+    setInputText(''); 
     setMessages((prev) => [...prev, { role: 'user', text: userMessage }]);
     setIsTyping(true);
 
     try {
-      // Send the question and the selected document ID to FastAPI
       const res = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: userMessage,
-          doc_id: selectedDocId || null, // null means "search all documents"
-          chat_history: [] // Left blank for now (stretch goal!)
+          doc_id: selectedDocId || null,
+          chat_history: [] 
         }),
       });
-
       const data = await res.json();
-
-      // Add the bot's response and citation sources to the chat interface
-      setMessages((prev) => [
-        ...prev,
-        { role: 'bot', text: data.answer, sources: data.sources }
-      ]);
+      setMessages((prev) => [...prev, { role: 'bot', text: data.answer, sources: data.sources }]);
     } catch (error) {
       setMessages((prev) => [...prev, { role: 'bot', text: 'Sorry, I encountered an error.' }]);
     } finally {
@@ -99,15 +135,25 @@ function App() {
     }
   };
 
+  // Helper to extract the chart JSON from the LLM's text response
+  const parseMessageContent = (text) => {
+    // Regex to find <chart>...</chart> blocks
+    const chartRegex = /<chart>([\s\S]*?)<\/chart>/;
+    const match = text.match(chartRegex);
+    
+    if (match) {
+      const rawText = text.replace(match[0], ''); // Remove the tag from the text
+      const chartJson = match[1].trim(); // Extract the JSON inside
+      return { rawText, chartJson };
+    }
+    return { rawText: text, chartJson: null };
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans">
-      
-      {/* HEADER & UPLOAD SECTION */}
       <header className="bg-white shadow p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <h1 className="text-xl font-bold text-blue-600">PDF RAG Chatbot</h1>
-        
+        <h1 className="text-xl font-bold text-blue-600">Analytics RAG Chatbot</h1>
         <div className="flex items-center gap-4">
-          {/* Document Selector Dropdown */}
           <select 
             className="border rounded p-2 text-sm outline-none"
             value={selectedDocId}
@@ -115,13 +161,9 @@ function App() {
           >
             <option value="">All Documents</option>
             {documents.map((doc) => (
-              <option key={doc.doc_id} value={doc.doc_id}>
-                {doc.filename}
-              </option>
+              <option key={doc.doc_id} value={doc.doc_id}>{doc.filename}</option>
             ))}
           </select>
-
-          {/* Upload Button */}
           <label className="bg-blue-600 text-white px-4 py-2 rounded cursor-pointer hover:bg-blue-700 transition text-sm">
             {isUploading ? 'Uploading...' : 'Upload PDF'}
             <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
@@ -129,41 +171,45 @@ function App() {
         </div>
       </header>
 
-      {/* CHAT DISPLAY SECTION */}
       <main className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-        {messages.length === 0 && (
-          <div className="text-center text-gray-400 mt-10">
-            Upload a PDF and ask a question to get started!
-          </div>
-        )}
-
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`max-w-[80%] p-4 rounded-lg shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white self-end' : 'bg-white text-gray-800 self-start border'}`}>
-            <p className="whitespace-pre-wrap">{msg.text}</p>
-            
-            {/* Render sources only if they exist and it's a bot message */}
-            {msg.sources && msg.sources.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <p className="text-xs font-semibold text-gray-500 mb-1">Sources:</p>
-                <ul className="text-xs text-gray-500 list-disc pl-4">
-                  {msg.sources.map((src, i) => (
-                    <li key={i}>Page {src.page_number} ({src.filename})</li>
-                  ))}
-                </ul>
+        {messages.map((msg, idx) => {
+          const { rawText, chartJson } = parseMessageContent(msg.text);
+          return (
+            <div key={idx} className={`max-w-[85%] p-4 rounded-lg shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white self-end' : 'bg-white text-gray-800 self-start border'}`}>
+              
+              {/* Render Text and Tables using Markdown */}
+              <div className="prose prose-sm max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {rawText}
+                </ReactMarkdown>
               </div>
-            )}
-          </div>
-        ))}
-        {isTyping && <div className="text-sm text-gray-400 italic self-start">Bot is analyzing document...</div>}
+
+              {/* Render Chart if present */}
+              {chartJson && <ChartRenderer chartJson={chartJson} />}
+              
+              {/* Render Sources */}
+              {msg.sources && msg.sources.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs font-semibold text-gray-500 mb-1">Sources:</p>
+                  <ul className="text-xs text-gray-500 list-disc pl-4">
+                    {msg.sources.map((src, i) => (
+                      <li key={i}>Page {src.page_number} ({src.filename})</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {isTyping && <div className="text-sm text-gray-400 italic self-start">Bot is analyzing data...</div>}
       </main>
 
-      {/* CHAT INPUT FORM */}
       <footer className="bg-white p-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
         <form onSubmit={sendMessage} className="flex gap-2 max-w-4xl mx-auto">
           <input
             type="text"
             className="flex-1 border rounded-lg p-3 outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Ask a question about your PDFs..."
+            placeholder="Ask for a summary, a table, or a pie chart..."
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             disabled={isTyping}
