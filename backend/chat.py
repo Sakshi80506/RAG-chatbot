@@ -106,23 +106,49 @@ def ask_question(
     3. Build prompt with context + history.
     4. Call LLM to generate answer.
     """
-    # 1. Retrieve top-4 chunks
-    retrieved_docs = retrieve_relevant_chunks(query=question, doc_id=doc_id, k=4)
+    llm = get_llm()
+    search_query = question
+    formatted_history = ""
+
+    # Reformulate follow-up questions into standalone database queries.
+    if chat_history and len(chat_history) > 0:
+        history_lines = []
+        for msg in chat_history:
+            role = "User" if msg.get("role") == "user" else "Assistant"
+            history_lines.append(f"{role}: {msg.get('text', '')}")
+
+        formatted_history = "\n".join(history_lines[-4:])
+        rewrite_prompt = ChatPromptTemplate.from_messages([
+            ("system",
+             "Given the chat history and the latest user question, rewrite the user's question into a standalone query that includes all context necessary for a database search. "
+             "Do NOT answer the question, ONLY return the rewritten search query. If the question doesn't need context, return it exactly as is."),
+            ("human", "Chat History:\n{history}\n\nLatest Question: {question}\n\nStandalone Search Query:")
+        ])
+        formatted_rewrite = rewrite_prompt.format_messages(
+            history=formatted_history,
+            question=question
+        )
+        search_query = llm.invoke(formatted_rewrite).content.strip()
+        print(f"\n[Memory] Original: {question}")
+        print(f"[Memory] Rewritten for search: {search_query}\n")
+
+    # Retrieve using the standalone query rather than unresolved pronouns.
+    retrieved_docs = retrieve_relevant_chunks(query=search_query, doc_id=doc_id, k=4)
     
     if not retrieved_docs:
         return {
-            "answer": "No relevant information found in the uploaded document(s).",
+            "answer": "No relevant information found.",
             "sources": []
         }
 
     # 2. Format context string
     context_text = format_context(retrieved_docs)
 
-    # 3. Create the prompt template with Analytics Instructions
+    # Include recent history so the answer remains natural and coherent.
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", 
-         "You are a helpful data assistant answering questions about PDFs.\n"
-         "Answer using ONLY the provided context.\n\n"
+         "You are a helpful data assistant. Answer the user's latest question using ONLY the provided context.\n"
+         "You may use the Chat History to understand the flow of the conversation, but your facts must come from the Context.\n\n"
          "FORMATTING RULES:\n"
          "- If the user asks for a TABLE, format it strictly using Markdown tables.\n"
          "- If the user asks for a CHART or GRAPH (bar, line, or pie), extract the numerical data and include a JSON block wrapped EXACTLY in <chart> tags at the end of your response.\n\n"
@@ -131,12 +157,14 @@ def ask_question(
          '{{"type": "bar", "data": [{{"name": "Revenue", "value": 5000}}, {{"name": "Profit", "value": 2000}}]}}\n'
          "</chart>\n\n"
          "Valid chart types are: 'bar', 'line', 'pie'. The data array must contain objects with 'name' (string) and 'value' (number).\n\n"
+         "CHAT HISTORY:\n{history}\n\n"
          "CONTEXT:\n{context}"),
         ("human", "{question}")
     ])
 
     # 4. Fill the template and invoke LLM
     formatted_prompt = prompt_template.format_messages(
+        history=formatted_history if formatted_history else "No previous history.",
         context=context_text,
         question=question
     )

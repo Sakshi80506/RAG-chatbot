@@ -265,13 +265,18 @@ function App() {
     setIsTyping(true);
 
     try {
+      const historyPayload = messages.map((msg) => ({
+        role: msg.role,
+        text: msg.text,
+      }));
+
       const res = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: userMessage,
           doc_id: selectedDocId || null,
-          chat_history: [] 
+          chat_history: historyPayload
         }),
       });
       const data = await res.json();
