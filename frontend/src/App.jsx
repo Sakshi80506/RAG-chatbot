@@ -206,32 +206,53 @@ function App() {
   const saveMessageToHistory = (userText, botMessage) => {
     const document = documents.find((item) => item.doc_id === selectedDocId);
     const now = new Date();
-    const session = {
-      id: crypto.randomUUID(),
-      date: now.toISOString(),
-      docId: selectedDocId || null,
-      docName: document?.filename || 'All documents',
-      messages: [
-        { role: 'user', text: userText },
-        botMessage,
-      ],
-    };
-    setChatSessions((previous) => [session, ...previous]);
+    const newMessages = [
+      { role: 'user', text: userText },
+      botMessage,
+    ];
+    setChatSessions((previous) => {
+      const existingSession = previous.find((session) => session.docId === (selectedDocId || null));
+      if (!existingSession) {
+        return [{
+          id: crypto.randomUUID(),
+          date: now.toISOString(),
+          docId: selectedDocId || null,
+          docName: document?.filename || 'All documents',
+          messages: newMessages,
+        }, ...previous];
+      }
+
+      return previous.map((session) => session.id === existingSession.id
+        ? {
+          ...session,
+          date: now.toISOString(),
+          docName: document?.filename || session.docName,
+          messages: [...session.messages, ...newMessages],
+        }
+        : session);
+    });
   };
 
   const openChatSession = (session) => {
     setMessages(session.messages);
     setSelectedDocId(session.docId || '');
-    setActiveSection('home');
+    setActiveSection('chat');
   };
 
-  const groupedSessions = chatSessions.reduce((groups, session) => {
-    const dateKey = new Date(session.date).toLocaleDateString([], {
-      dateStyle: 'full',
-    });
-    groups[dateKey] = [...(groups[dateKey] || []), session];
-    return groups;
-  }, {});
+  const groupedSessions = Object.values([...chatSessions]
+    .sort((first, second) => new Date(first.date) - new Date(second.date))
+    .reduce((sessionsByDocument, session) => {
+    const documentKey = session.docId || 'all-documents';
+    const existingSession = sessionsByDocument[documentKey];
+    sessionsByDocument[documentKey] = existingSession
+      ? {
+        ...existingSession,
+        date: new Date(session.date) > new Date(existingSession.date) ? session.date : existingSession.date,
+        messages: [...existingSession.messages, ...session.messages],
+      }
+      : { ...session };
+    return sessionsByDocument;
+    }, {})).sort((first, second) => new Date(second.date) - new Date(first.date));
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
@@ -380,25 +401,26 @@ function App() {
             <button type="button" onClick={startNewChat} className="text-sm font-semibold text-blue-600 hover:text-blue-800">New chat</button>
           </div>
           {chatSessions.length === 0 && <p className="text-sm text-gray-400">No chat history yet.</p>}
-          <div className="space-y-5">
-            {Object.entries(groupedSessions).map(([date, sessions]) => (
-              <div key={date}>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{date}</h3>
-                <div className="space-y-2">
-                  {sessions.map((session) => (
-                    <button type="button" key={session.id} onClick={() => openChatSession(session)} className="w-full border rounded-md p-3 text-left hover:border-blue-400 hover:bg-blue-50">
-                      <p className="text-sm font-medium text-gray-800 truncate">{session.messages[0]?.text}</p>
-                      <p className="text-xs text-gray-500 mt-1">PDF: {session.docName} · {new Date(session.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <div className="space-y-2">
+            {groupedSessions.map((session) => (
+              <button type="button" key={session.docId || 'all-documents'} onClick={() => openChatSession(session)} className="w-full border rounded-md p-3 text-left hover:border-blue-400 hover:bg-blue-50">
+                <p className="text-sm font-medium text-gray-800">{session.docName}</p>
+                <p className="text-xs text-gray-500 mt-1">{session.messages.length / 2} questions · Last active {new Date(session.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                <p className="mt-2 truncate text-xs text-slate-600">{session.messages[session.messages.length - 2]?.text || 'No questions yet'}</p>
+              </button>
             ))}
           </div>
         </section>}
 
-        {activeSection === 'home' && <section className="flex-1 min-w-0 overflow-y-auto">
-          <AnalyticsDashboard documents={documents} />
+        {(activeSection === 'home' || activeSection === 'chat') && <section className="flex-1 min-w-0 overflow-y-auto">
+          {activeSection === 'home' && <AnalyticsDashboard documents={documents} />}
+          {activeSection === 'chat' && <div className="mb-5 flex items-center justify-between border-b border-slate-200 pb-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Saved conversation</p>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{documents.find((document) => document.doc_id === selectedDocId)?.filename || 'All documents'}</h2>
+            </div>
+            <button type="button" onClick={() => setActiveSection('history')} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Back to history</button>
+          </div>}
           <div className="flex flex-col gap-4">
           {messages.map((msg, idx) => {
             const { rawText, chartJson } = parseMessageContent(msg.text);
