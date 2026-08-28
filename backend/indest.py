@@ -1,5 +1,6 @@
 import os
 import uuid
+from datetime import datetime, timezone
 from typing import List
 from dotenv import load_dotenv
 
@@ -41,7 +42,7 @@ def get_vector_store() -> Chroma:
     )
 
 
-def ingest_pdf(file_path: str, doc_id: str = None) -> dict:
+def ingest_pdf(file_path: str, doc_id: str = None, filename: str = None) -> dict:
     """
     Full Ingestion Pipeline:
     1. Loads PDF page-by-page.
@@ -56,7 +57,8 @@ def ingest_pdf(file_path: str, doc_id: str = None) -> dict:
     if not doc_id:
         doc_id = str(uuid.uuid4())
 
-    filename = os.path.basename(file_path)
+    filename = filename or os.path.basename(file_path)
+    upload_date = datetime.now(timezone.utc).isoformat()
     print(f"\n[1/4] Loading PDF: {filename}...")
 
     # Step 1: Load PDF pages using PyPDFLoader
@@ -80,6 +82,8 @@ def ingest_pdf(file_path: str, doc_id: str = None) -> dict:
     for chunk in chunks:
         chunk.metadata["doc_id"] = doc_id
         chunk.metadata["filename"] = filename
+        chunk.metadata["upload_date"] = upload_date
+        chunk.metadata["total_pages"] = len(raw_pages)
         if "page" in chunk.metadata:
             chunk.metadata["page_number"] = chunk.metadata["page"] + 1
 

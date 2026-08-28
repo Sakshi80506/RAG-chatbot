@@ -71,6 +71,8 @@ function App() {
   const [inputText, setInputText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
+  const [deletingDocId, setDeletingDocId] = useState(null);
 
   useEffect(() => {
     fetchDocuments();
@@ -83,7 +85,38 @@ function App() {
       setDocuments(data);
     } catch (error) {
       console.error("Failed to fetch documents", error);
+    } finally {
+      setIsLoadingDocuments(false);
     }
+  };
+
+  const openDocument = (doc) => {
+    if (!doc.file_available) {
+      alert('This PDF is not available. Please upload it again to view it.');
+      return;
+    }
+    window.open(`${API_URL}${doc.open_url}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const deleteDocument = async (doc) => {
+    if (!window.confirm(`Delete ${doc.filename}? This cannot be undone.`)) return;
+
+    setDeletingDocId(doc.doc_id);
+    try {
+      const res = await fetch(`${API_URL}/documents/${doc.doc_id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+      if (selectedDocId === doc.doc_id) setSelectedDocId('');
+      await fetchDocuments();
+    } catch (error) {
+      alert('Unable to delete the document.');
+    } finally {
+      setDeletingDocId(null);
+    }
+  };
+
+  const formatUploadDate = (uploadDate) => {
+    if (!uploadDate) return 'Date unavailable';
+    return new Date(uploadDate).toLocaleDateString();
   };
 
   const handleFileUpload = async (event) => {
@@ -171,37 +204,59 @@ function App() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-        {messages.map((msg, idx) => {
-          const { rawText, chartJson } = parseMessageContent(msg.text);
-          return (
-            <div key={idx} className={`max-w-[85%] p-4 rounded-lg shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white self-end' : 'bg-white text-gray-800 self-start border'}`}>
-              
-              {/* Render Text and Tables using Markdown */}
-              <div className="prose prose-sm max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {rawText}
-                </ReactMarkdown>
-              </div>
-
-              {/* Render Chart if present */}
-              {chartJson && <ChartRenderer chartJson={chartJson} />}
-              
-              {/* Render Sources */}
-              {msg.sources && msg.sources.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs font-semibold text-gray-500 mb-1">Sources:</p>
-                  <ul className="text-xs text-gray-500 list-disc pl-4">
-                    {msg.sources.map((src, i) => (
-                      <li key={i}>Page {src.page_number} ({src.filename})</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+      <main className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col lg:flex-row gap-4">
+        <aside className="w-full lg:w-72 shrink-0 bg-white border rounded-lg shadow-sm p-4 flex flex-col max-h-64 lg:max-h-none">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-semibold text-gray-800">Uploaded documents</h2>
+              <p className="text-xs text-gray-500 mt-1">{documents.length} {documents.length === 1 ? 'file' : 'files'}</p>
             </div>
-          );
-        })}
-        {isTyping && <div className="text-sm text-gray-400 italic self-start">Bot is analyzing data...</div>}
+            <button type="button" onClick={fetchDocuments} className="text-xs text-blue-600 hover:text-blue-800" title="Refresh document list">
+              Refresh
+            </button>
+          </div>
+          <div className="overflow-y-auto space-y-2">
+            {isLoadingDocuments && <p className="text-sm text-gray-400">Loading documents...</p>}
+            {!isLoadingDocuments && documents.length === 0 && <p className="text-sm text-gray-400">No PDFs uploaded yet.</p>}
+            {documents.map((doc) => (
+              <div key={doc.doc_id} className="border rounded-md p-3">
+                <p className="text-sm font-medium text-gray-700 truncate" title={doc.filename}>{doc.filename}</p>
+                <p className="text-xs text-gray-500 mt-1">{doc.total_pages || '—'} pages · Uploaded {formatUploadDate(doc.upload_date)}</p>
+                <div className="flex items-center gap-3 mt-2">
+                  <button type="button" onClick={() => openDocument(doc)} disabled={!doc.file_available} className="text-xs font-semibold text-blue-600 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-not-allowed" title={doc.file_available ? 'Open PDF' : 'PDF unavailable; upload it again'}>
+                    {doc.file_available ? 'Open PDF' : 'Unavailable'}
+                  </button>
+                  <button type="button" onClick={() => deleteDocument(doc)} disabled={deletingDocId === doc.doc_id} className="text-xs font-semibold text-red-600 hover:text-red-800 disabled:text-gray-400">
+                    {deletingDocId === doc.doc_id ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <section className="flex-1 min-w-0 overflow-y-auto flex flex-col gap-4">
+          {messages.map((msg, idx) => {
+            const { rawText, chartJson } = parseMessageContent(msg.text);
+            return (
+              <div key={idx} className={`max-w-[85%] p-4 rounded-lg shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white self-end' : 'bg-white text-gray-800 self-start border'}`}>
+                <div className="prose prose-sm max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{rawText}</ReactMarkdown>
+                </div>
+                {chartJson && <ChartRenderer chartJson={chartJson} />}
+                {msg.sources && msg.sources.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs font-semibold text-gray-500 mb-1">Sources:</p>
+                    <ul className="text-xs text-gray-500 list-disc pl-4">
+                      {msg.sources.map((src, i) => <li key={i}>Page {src.page_number} ({src.filename})</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {isTyping && <div className="text-sm text-gray-400 italic self-start">Bot is analyzing data...</div>}
+        </section>
       </main>
 
       <footer className="bg-white p-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
