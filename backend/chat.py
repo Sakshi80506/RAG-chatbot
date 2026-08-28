@@ -63,6 +63,21 @@ def retrieve_relevant_chunks(
     return results
 
 
+def retrieve_relevant_chunks_with_scores(
+    query: str,
+    doc_id: Optional[str] = None,
+    k: int = 4,
+) -> List[Any]:
+    """Retrieves chunks with Chroma similarity distances for advanced users."""
+    vector_store = Chroma(
+        collection_name="pdf_documents",
+        embedding_function=get_embedding_function(),
+        persist_directory=CHROMA_PERSIST_DIRECTORY
+    )
+    filter_dict = {"doc_id": doc_id} if doc_id else None
+    return vector_store.similarity_search_with_score(query=query, k=k, filter=filter_dict)
+
+
 def format_context(documents: List[Document]) -> str:
     """
     Step 2: CONTEXT FORMATTING
@@ -79,24 +94,32 @@ def format_context(documents: List[Document]) -> str:
     return "\n\n".join(context_parts)
 
 
-def extract_sources(documents: List[Document]) -> List[Dict[str, Any]]:
+def extract_sources(
+    documents: List[Document],
+    scores: Optional[List[float]] = None,
+) -> List[Dict[str, Any]]:
     """
     Helper to extract clean source citations for the UI.
     """
     sources = []
-    for doc in documents:
-        sources.append({
+    for index, doc in enumerate(documents):
+        source = {
             "filename": doc.metadata.get("filename", "Unknown"),
             "page_number": doc.metadata.get("page_number", "Unknown"),
-            "snippet": doc.page_content[:200] + "..."  # Short snippet preview
-        })
+            "snippet": doc.page_content.strip()
+        }
+        if scores is not None:
+            source["score"] = round(float(scores[index]), 4)
+        sources.append(source)
     return sources
 
 
 def ask_question(
     question: str, 
     doc_id: Optional[str] = None, 
-    chat_history: Optional[List[Dict[str, str]]] = None
+    chat_history: Optional[List[Dict[str, str]]] = None,
+    top_k: int = 4,
+    show_scores: bool = False,
 ) -> Dict[str, Any]:
     """
     Step 3: GENERATION
@@ -133,7 +156,14 @@ def ask_question(
         print(f"[Memory] Rewritten for search: {search_query}\n")
 
     # Retrieve using the standalone query rather than unresolved pronouns.
-    retrieved_docs = retrieve_relevant_chunks(query=search_query, doc_id=doc_id, k=4)
+    top_k = max(1, min(top_k, 12))
+    retrieval_results = retrieve_relevant_chunks_with_scores(
+        query=search_query,
+        doc_id=doc_id,
+        k=top_k,
+    )
+    retrieved_docs = [document for document, score in retrieval_results]
+    retrieval_scores = [score for document, score in retrieval_results]
     
     if not retrieved_docs:
         return {
@@ -173,7 +203,10 @@ def ask_question(
     response = llm.invoke(formatted_prompt)
 
     # 5. Extract citation sources
-    sources = extract_sources(retrieved_docs)
+    sources = extract_sources(
+        retrieved_docs,
+        retrieval_scores if show_scores else None,
+    )
 
     return {
         "answer": response.content,

@@ -1,1 +1,124 @@
 @import "tailwindcss";
+
+:root {
+	font-family: "Segoe UI", sans-serif;
+	color: #172033;
+	background: #f4f7fb;
+}
+
+body {
+	margin: 0;
+}
+
+.theme-shell {
+	--page-bg: #f4f7fb;
+	--surface: #ffffff;
+	--surface-muted: #f8fafc;
+	--line: #dbe3ef;
+	--text: #172033;
+	--text-muted: #64748b;
+	--accent: #2563eb;
+	background: var(--page-bg) !important;
+	color: var(--text);
+	transition: background-color 180ms ease, color 180ms ease;
+}
+
+.theme-shell.dark-theme {
+	--page-bg: #0b1120;
+	--surface: #111a2e;
+	--surface-muted: #172238;
+	--line: #293751;
+	--text: #e7edf7;
+	--text-muted: #9aa9c1;
+	--accent: #60a5fa;
+}
+
+.dark-theme .bg-white,
+.dark-theme .bg-gray-50 {
+	background-color: var(--surface) !important;
+}
+
+.dark-theme .bg-slate-50 {
+	background-color: var(--surface-muted) !important;
+}
+
+.dark-theme .border-slate-200,
+.dark-theme .border-slate-100,
+.dark-theme .border-gray-200 {
+	border-color: var(--line) !important;
+}
+
+.dark-theme .text-slate-900,
+.dark-theme .text-slate-800,
+.dark-theme .text-gray-800,
+.dark-theme .text-gray-700 {
+	color: var(--text) !important;
+}
+
+.dark-theme .text-slate-600,
+.dark-theme .text-slate-500,
+.dark-theme .text-gray-500,
+.dark-theme .text-gray-400 {
+	color: var(--text-muted) !important;
+}
+
+.dark-theme .text-blue-700,
+.dark-theme .text-blue-600 {
+	color: var(--accent) !important;
+}
+
+.dark-theme .bg-blue-50 {
+	background-color: #172f55 !important;
+}
+
+.dark-theme .hover\:bg-slate-50:hover {
+	background-color: var(--surface-muted) !important;
+}
+
+.dark-theme select,
+.dark-theme input {
+	background-color: var(--surface-muted);
+	border-color: var(--line);
+	color: var(--text);
+}
+
+.dark-theme input::placeholder {
+	color: #8291aa;
+}
+
+.dark-theme .theme-toggle {
+	border-color: var(--line);
+	color: var(--text);
+}
+
+.dark-theme .theme-toggle:hover {
+	background-color: var(--surface-muted);
+}
+
+.dark-theme .prose {
+	color: var(--text);
+}
+
+.dark-theme .prose strong,
+.dark-theme .prose h1,
+.dark-theme .prose h2,
+.dark-theme .prose h3 {
+	color: var(--text);
+}
+
+.dark-theme .recharts-cartesian-axis-tick-value,
+.dark-theme .recharts-polar-angle-axis-tick-value,
+.dark-theme .recharts-legend-item-text {
+	fill: var(--text-muted) !important;
+	color: var(--text-muted) !important;
+}
+
+.dark-theme .recharts-cartesian-grid line {
+	stroke: var(--line);
+}
+
+.dark-theme .recharts-default-tooltip {
+	border-color: var(--line) !important;
+	background-color: var(--surface) !important;
+	color: var(--text) !important;
+}

@@ -127,6 +127,9 @@ const ChartRenderer = ({ chartJson }) => {
 
 // --- MAIN APP ---
 function App() {
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('rag-theme') === 'dark';
+  });
   const [activeSection, setActiveSection] = useState('home');
   const [documents, setDocuments] = useState([]);
   const [selectedDocId, setSelectedDocId] = useState('');
@@ -136,6 +139,9 @@ function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
   const [deletingDocId, setDeletingDocId] = useState(null);
+  const [selectedSource, setSelectedSource] = useState(null);
+  const [topK, setTopK] = useState(4);
+  const [showScores, setShowScores] = useState(false);
   const [chatSessions, setChatSessions] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('rag-chat-sessions') || '[]');
@@ -147,6 +153,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem('rag-chat-sessions', JSON.stringify(chatSessions));
   }, [chatSessions]);
+
+  useEffect(() => {
+    localStorage.setItem('rag-theme', isDarkMode ? 'dark' : 'light');
+  }, [isDarkMode]);
 
   useEffect(() => {
     fetchDocuments();
@@ -236,6 +246,7 @@ function App() {
   const openChatSession = (session) => {
     setMessages(session.messages);
     setSelectedDocId(session.docId || '');
+    setSelectedSource(null);
     setActiveSection('chat');
   };
 
@@ -297,7 +308,9 @@ function App() {
         body: JSON.stringify({
           question: userMessage,
           doc_id: selectedDocId || null,
-          chat_history: historyPayload
+          chat_history: historyPayload,
+          top_k: Number(topK),
+          show_scores: showScores,
         }),
       });
       const data = await res.json();
@@ -326,11 +339,14 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 font-sans">
+    <div className={`theme-shell ${isDarkMode ? 'dark-theme' : 'light-theme'} flex flex-col h-screen bg-gray-50 font-sans`}>
       <header className="border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-bold tracking-tight text-slate-900">Analytics <span className="text-blue-600">RAG</span></h1>
           <div className="flex items-center gap-3">
+          <button type="button" onClick={() => setIsDarkMode((current) => !current)} className="theme-toggle rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50" aria-label="Switch color theme">
+            {isDarkMode ? 'Light mode' : 'Dark mode'}
+          </button>
           <select 
             className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm outline-none focus:border-blue-500"
             value={selectedDocId}
@@ -420,14 +436,26 @@ function App() {
         </section>}
 
         {activeSection === 'chat' && <section className="flex-1 min-w-0 overflow-y-auto">
-          {activeSection === 'chat' && <div className="mb-5 flex items-center justify-between border-b border-slate-200 pb-4">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Saved conversation</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Conversation workspace</p>
               <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{documents.find((document) => document.doc_id === selectedDocId)?.filename || 'All documents'}</h2>
             </div>
             <button type="button" onClick={() => setActiveSection('history')} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Back to history</button>
-          </div>}
-          <div className="flex flex-col gap-4">
+          </div>
+          <div className="mb-4 flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+            <label className="flex items-center gap-2 font-medium text-slate-700">
+              Retrieval depth
+              <input type="number" min="1" max="12" value={topK} onChange={(event) => setTopK(Math.max(1, Math.min(12, event.target.value)))} className="w-16 rounded-md border border-slate-200 bg-white px-2 py-1 text-center" />
+            </label>
+            <label className="flex items-center gap-2 text-slate-700">
+              <input type="checkbox" checked={showScores} onChange={(event) => setShowScores(event.target.checked)} />
+              Show retrieval scores
+            </label>
+            <span className="text-xs text-slate-500">Advanced retrieval controls</span>
+          </div>
+          <div className="flex flex-col gap-4 xl:flex-row">
+          <div className="flex min-w-0 flex-1 flex-col gap-4">
           {messages.map((msg, idx) => {
             const { rawText, chartJson } = parseMessageContent(msg.text);
             return (
@@ -439,15 +467,30 @@ function App() {
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <p className="text-xs font-semibold text-gray-500 mb-1">Sources:</p>
-                    <ul className="text-xs text-gray-500 list-disc pl-4">
-                      {msg.sources.map((src, i) => <li key={i}>Page {src.page_number} ({src.filename})</li>)}
+                    <ul className="space-y-1 text-xs text-gray-500">
+                      {msg.sources.map((src, i) => (
+                        <li key={i}>
+                          <button type="button" onClick={() => setSelectedSource(src)} className="text-left text-blue-600 underline-offset-2 hover:underline">
+                            Page {src.page_number} ({src.filename}){src.score !== undefined ? ` · score ${src.score}` : ''}
+                          </button>
+                        </li>
+                      ))}
                     </ul>
+                    {selectedSource && msg.sources.includes(selectedSource) && <div className="mt-3 rounded-md bg-slate-50 p-3 text-xs text-slate-600"><p className="mb-1 font-semibold text-slate-800">Retrieved chunk</p><p className="whitespace-pre-wrap">{selectedSource.snippet}</p></div>}
                   </div>
                 )}
               </div>
             );
           })}
           {isTyping && <div className="text-sm text-gray-400 italic self-start">Bot is analyzing data...</div>}
+          </div>
+          <aside className="w-full xl:w-[min(38%,420px)] shrink-0 space-y-4">
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-4 py-3"><h3 className="font-semibold text-slate-900">Document preview</h3><p className="mt-1 text-xs text-slate-500">{selectedDocId ? 'Reference PDF' : 'Select a PDF to preview it'}</p></div>
+              {documents.find((document) => document.doc_id === selectedDocId)?.file_available ? <iframe title="PDF preview" src={`${API_URL}${documents.find((document) => document.doc_id === selectedDocId).open_url}`} className="h-[520px] w-full" /> : <div className="flex h-64 items-center justify-center bg-slate-50 px-6 text-center text-sm text-slate-400">Choose a specific available PDF from the selector above to preview it here.</div>}
+            </div>
+            {selectedSource && <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h3 className="font-semibold text-slate-900">Selected source</h3><p className="mt-1 text-xs text-slate-500">{selectedSource.filename} · Page {selectedSource.page_number}</p><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">{selectedSource.snippet}</p></div>}
+          </aside>
           </div>
         </section>}
       </main>

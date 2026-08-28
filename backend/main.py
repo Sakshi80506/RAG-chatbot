@@ -39,11 +39,14 @@ class ChatRequest(BaseModel):
     question: str
     doc_id: Optional[str] = None
     chat_history: Optional[List[Dict[str, str]]] = []
+    top_k: int = 4
+    show_scores: bool = False
 
 class SourceItem(BaseModel):
     filename: str
     page_number: int
     snippet: str
+    score: Optional[float] = None
 
 class ChatResponse(BaseModel):
     answer: str
@@ -236,7 +239,9 @@ def chat_with_document(request: ChatRequest):
         result = ask_question(
             question=request.question,
             doc_id=request.doc_id,
-            chat_history=request.chat_history
+            chat_history=request.chat_history,
+            top_k=request.top_k,
+            show_scores=request.show_scores,
         )
         
         return ChatResponse(
