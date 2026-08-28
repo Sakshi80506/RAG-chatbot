@@ -200,7 +200,7 @@ function App() {
     setMessages([]);
     setInputText('');
     setSelectedDocId('');
-    setActiveSection('home');
+    setActiveSection('chat');
   };
 
   const saveMessageToHistory = (userText, botMessage) => {
@@ -412,8 +412,14 @@ function App() {
           </div>
         </section>}
 
-        {(activeSection === 'home' || activeSection === 'chat') && <section className="flex-1 min-w-0 overflow-y-auto">
-          {activeSection === 'home' && <AnalyticsDashboard documents={documents} />}
+        {activeSection === 'home' && <section className="flex-1 min-w-0 overflow-y-auto">
+          <AnalyticsDashboard documents={documents} />
+          <button type="button" onClick={startNewChat} className="rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
+            Start chat
+          </button>
+        </section>}
+
+        {activeSection === 'chat' && <section className="flex-1 min-w-0 overflow-y-auto">
           {activeSection === 'chat' && <div className="mb-5 flex items-center justify-between border-b border-slate-200 pb-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Saved conversation</p>
@@ -447,7 +453,7 @@ function App() {
       </main>
       </div>
 
-      <footer className="bg-white p-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+      {activeSection === 'chat' && <footer className="bg-white p-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
         <form onSubmit={sendMessage} className="flex gap-2 max-w-4xl mx-auto">
           <input
             type="text"
@@ -465,7 +471,7 @@ function App() {
             Send
           </button>
         </form>
-      </footer>
+      </footer>}
     </div>
   );
 }
