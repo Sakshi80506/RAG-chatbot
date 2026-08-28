@@ -2,6 +2,7 @@ import os
 import shutil
 import tempfile
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -139,7 +140,9 @@ def list_documents():
                 "doc_id": doc_id,
                 "filename": details["filename"],
                 "total_pages": details["total_pages"],
-                "upload_date": details["upload_date"],
+                "upload_date": details["upload_date"] or get_document_upload_date(
+                    doc_id, details["filename"]
+                ),
                 "open_url": f"/documents/{doc_id}/file",
                 "file_available": os.path.isfile(
                     os.path.join(UPLOADS_DIRECTORY, f"{doc_id}.pdf")
@@ -153,6 +156,18 @@ def list_documents():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving documents: {str(e)}")
+
+
+def get_document_upload_date(doc_id: str, filename: str) -> Optional[str]:
+    """Uses the PDF file timestamp for documents created before metadata tracking."""
+    archived_path = os.path.join(UPLOADS_DIRECTORY, f"{doc_id}.pdf")
+    legacy_path = os.path.join(os.path.dirname(__file__), os.path.basename(filename))
+    file_path = archived_path if os.path.isfile(archived_path) else legacy_path
+    if not os.path.isfile(file_path):
+        return None
+    return datetime.fromtimestamp(
+        os.path.getctime(file_path), timezone.utc
+    ).isoformat()
 
 
 @app.get("/documents/{doc_id}/file")

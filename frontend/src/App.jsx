@@ -116,7 +116,10 @@ function App() {
 
   const formatUploadDate = (uploadDate) => {
     if (!uploadDate) return 'Date unavailable';
-    return new Date(uploadDate).toLocaleDateString();
+    return new Date(uploadDate).toLocaleString([], {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
   };
 
   const handleFileUpload = async (event) => {
