@@ -134,10 +134,11 @@ function App() {
         await fetchDocuments();
         alert('File uploaded successfully!');
       } else {
-        alert('Upload failed.');
+        const errorData = await res.json().catch(() => ({}));
+        alert(errorData.detail || 'Upload failed.');
       }
     } catch (error) {
-      alert('Error uploading file.');
+      alert('Unable to reach the backend. Make sure the API server is running.');
     } finally {
       setIsUploading(false);
       event.target.value = ''; 

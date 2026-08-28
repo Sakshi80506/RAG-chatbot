@@ -73,7 +73,7 @@ async def upload_document(file: UploadFile = File(...)):
     Accepts a PDF file, temporarily saves it to disk, runs the ingestion pipeline,
     and deletes the temporary file.
     """
-    if not file.filename.lower().endswith('.pdf'):
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
     # Create a secure temporary file to save the uploaded data
@@ -85,6 +85,9 @@ async def upload_document(file: UploadFile = File(...)):
             # Efficiently stream chunks from the network directly to the disk
             shutil.copyfileobj(file.file, tmp_file)
             temp_file_path = tmp_file.name
+
+        if os.path.getsize(temp_file_path) == 0:
+            raise HTTPException(status_code=400, detail="The uploaded PDF is empty.")
         
         # Pass the physical file path to our ingestion logic
         result = ingest_pdf(temp_file_path, doc_id=doc_id, filename=original_filename)
@@ -95,8 +98,10 @@ async def upload_document(file: UploadFile = File(...)):
             "data": result
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Could not process this PDF: {str(e)}")
     
     finally:
         # Cleanup: Always delete the temporary file from the server to save space
