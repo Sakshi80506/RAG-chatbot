@@ -12,8 +12,8 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 # Import our custom RAG logic
-from indest import ingest_pdf, get_embedding_function, CHROMA_PERSIST_DIRECTORY
-from chat import ask_question
+from backend.indest import ingest_pdf, get_embedding_function, CHROMA_PERSIST_DIRECTORY
+from backend.chat import ask_question
 from langchain_chroma import Chroma
 
 load_dotenv()
