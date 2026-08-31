@@ -11,7 +11,7 @@ from langchain_groq import ChatGroq
 # from langchain_openai import ChatOpenAI
 
 # Import the embedding function and DB path we defined in ingest.py
-from indest import get_embedding_function, CHROMA_PERSIST_DIRECTORY
+from backend.indest import get_embedding_function, CHROMA_PERSIST_DIRECTORY
 
 load_dotenv()
 
