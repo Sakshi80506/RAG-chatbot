@@ -18,7 +18,8 @@ from langchain_chroma import Chroma
 
 load_dotenv()
 
-UPLOADS_DIRECTORY = os.path.join(os.path.dirname(__file__), "uploads")
+DATA_DIRECTORY = os.getenv("RAG_DATA_DIR", os.path.dirname(__file__))
+UPLOADS_DIRECTORY = os.path.join(DATA_DIRECTORY, "uploads")
 os.makedirs(UPLOADS_DIRECTORY, exist_ok=True)
 
 app = FastAPI(title="PDF RAG Chatbot API")

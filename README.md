@@ -105,6 +105,38 @@ cd backend
 python -m py_compile main.py chat.py indest.py
 ```
 
+## Deploy on Render
+
+This repository includes a [`render.yaml`](render.yaml) Blueprint that creates:
+
+- `rag-chatbot-api`: the FastAPI backend with a 1 GB persistent disk for PDFs,
+  ChromaDB, and the downloaded embedding model.
+- `rag-chatbot-frontend`: a static Vite site. Its `VITE_API_URL` is set
+  automatically to the backend's public URL during the build.
+
+1. Push this repository to GitHub, GitLab, or Bitbucket. Do not commit your
+   `backend/.env` file or uploaded PDFs.
+2. In the [Render Dashboard](https://dashboard.render.com/), select **New** >
+   **Blueprint**, connect the repository, and accept the services detected from
+   `render.yaml`.
+3. When Render prompts for it, enter `GROQ_API_KEY`. This value is marked as a
+   secret and is not stored in the repository.
+4. Deploy. Wait for the API to become live first; Render then builds the static
+   site with the API URL. Open the frontend service URL to use the app.
+
+The backend service uses Render's `starter` plan because PDF uploads and the
+Chroma vector database require a persistent disk. Do not use an ephemeral
+instance for production data: uploaded PDFs and indexes would disappear after
+a restart or redeploy.
+
+For a manual setup instead of a Blueprint, create a Python web service from
+`backend` with build command `pip install -r ../requirements.txt`, start command
+`uvicorn main:app --host 0.0.0.0 --port $PORT`, and the same environment
+variables and persistent-disk mount shown in `render.yaml`. Then create a
+static site with build command `cd frontend && npm ci && npm run build`, publish
+directory `frontend/dist`, and set `VITE_API_URL` to the API's `https://...onrender.com`
+URL before deploying the static site.
+
 ## API Endpoints
 
 | Method | Endpoint | Purpose |

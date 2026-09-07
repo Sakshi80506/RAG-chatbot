@@ -6,7 +6,9 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
 
-const API_URL = 'http://localhost:8000';
+// Vite exposes VITE_* variables at build time.  The fallback keeps the local
+// development workflow unchanged.
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Colors for the Pie Chart
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];

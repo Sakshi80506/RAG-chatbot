@@ -14,8 +14,12 @@ from langchain_core.documents import Document
 # Load environment variables (if any)
 load_dotenv()
 
-# Define where ChromaDB will persist its data on disk
-CHROMA_PERSIST_DIRECTORY = os.path.join(os.path.dirname(__file__), "chroma_db")
+# Store runtime data outside the source tree when a host provides a persistent
+# disk (Render sets RAG_DATA_DIR in render.yaml).  Local development keeps the
+# original backend/chroma_db location.
+DATA_DIRECTORY = os.getenv("RAG_DATA_DIR", os.path.dirname(__file__))
+CHROMA_PERSIST_DIRECTORY = os.path.join(DATA_DIRECTORY, "chroma_db")
+os.makedirs(CHROMA_PERSIST_DIRECTORY, exist_ok=True)
 
 
 def get_embedding_function() -> HuggingFaceEmbeddings:
