@@ -13,17 +13,13 @@ langchain
 langchain-openai
 langchain-community
 langchain-chroma
+langchain-text-splitters
+langchain-huggingface
+langchain-groq
 
 # PDF processing and tokenization
 pypdf
 tiktoken
-langchain
-langchain-community
-langchain-openai
-langchain-text-splitters
 openai
-python-dotenv
-pypdf
 faiss-cpu
 sentence-transformers
-langchain-groq
